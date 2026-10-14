@@ -1,0 +1,141 @@
+# AQUASIGHT AI — Hydrological Engine & Daily Simulator
+
+Authoritative Python computational backend providing physics-first hydrological modeling, external reanalysis weather ingestion, and continuous daily mass-balance simulation.
+
+---
+
+## 1. Mathematical Model & Mass Balance Convention
+
+### Continuous Daily Tank Water Balance
+Every simulated day satisfies the strict conservation-of-mass equation:
+$$\text{OpeningStorage}_t + Q_{\text{in}, t} = D_{\text{served}, t} + Q_{\text{overflow}, t} + \text{ClosingStorage}_t$$
+
+### Order of Operations:
+1. **Gross Precipitation Volume:** $V_{\text{gross}, t} = P_t \times A$ (where $1\text{ mm} \times 1\text{ m}^2 = 1.0\text{ Litre}$).
+2. **Rooftop Runoff:** $V_{\text{runoff}, t} = V_{\text{gross}, t} \times C_r$.
+3. **Event First-Flush Diversion:**
+   - Event trigger: identified when preceding dry days $\ge \text{dry\_period\_days}$ (default: 3 days).
+   - Target diversion volume: $V_{\text{target}} = d_{\text{ff}} \times A$ (e.g. $1.0\text{ mm} \times A$).
+   - Actual diversion: $V_{\text{ff}, t} = \min(V_{\text{runoff}, t}, V_{\text{target\_remaining}})$.
+   - Volume post first-flush: $V_{\text{post\_ff}, t} = V_{\text{runoff}, t} - V_{\text{ff}, t}$.
+4. **Conveyance & Filtration Recovery:**
+   - Conveyance loss: $L_{\text{convey}, t} = V_{\text{post\_ff}, t} \times (1 - \eta_{\text{convey}})$
+   - Filtration loss: $L_{\text{filter}, t} = (V_{\text{post\_ff}, t} \times \eta_{\text{convey}}) \times (1 - \eta_{\text{filter}})$
+   - Net inflow to tank: $Q_{\text{in}, t} = V_{\text{post\_ff}, t} \times \eta_{\text{convey}} \times \eta_{\text{filter}}$
+5. **Storage Allocation & Demand Satisfaction:**
+   - Available water: $W_{\text{avail}, t} = S_{t-1} + Q_{\text{in}, t}$
+   - Served demand: $D_{\text{served}, t} = \min(W_{\text{avail}, t}, D_t)$
+   - Remaining: $W_{\text{after\_demand}, t} = W_{\text{avail}, t} - D_{\text{served}, t}$
+   - Overflow spillage: $Q_{\text{overflow}, t} = \max(0, W_{\text{after\_demand}, t} - S_{\text{capacity}})$
+   - Closing storage: $S_t = \min(S_{\text{capacity}}, W_{\text{after\_demand}, t})$
+   - Unmet demand: $D_{\text{unmet}, t} = D_t - D_{\text{served}, t}$
+
+---
+
+## 2. Unit Conventions
+
+All calculations internally enforce strict SI compatibility:
+- **Catchment Area:** square metres ($\text{m}^2$)
+- **Rainfall Depth:** millimetres ($\text{mm}$)
+- **Volume & Storage:** Litres ($\text{L}$)
+- **Demand:** Litres per day ($\text{L/day}$)
+- **Runoff Coefficient & Efficiencies:** Dimensionless fractions $\in [0.0, 1.0]$
+
+---
+
+## 3. API Endpoints
+
+### `GET /api/v1/health`
+Health check and capability registry.
+
+### `POST /api/v1/rainfall/historical`
+Retrieves daily precipitation series from the Open-Meteo ERA5 archive with caching and provenance.
+```json
+{
+  "latitude": 12.9716,
+  "longitude": 77.5946,
+  "start_date": "2024-01-01",
+  "end_date": "2024-12-31"
+}
+```
+
+### `POST /api/v1/simulations`
+Executes daily continuous simulation.
+```json
+{
+  "assessment_id": "demo-001",
+  "catchment_area_sqm": 210.0,
+  "roof_material": "concrete_tile",
+  "runoff_coefficient": 0.8,
+  "tank_capacity_liters": 10000.0,
+  "initial_storage_liters": 0.0,
+  "daily_demand_liters": 480.0,
+  "first_flush_depth_mm": 1.0,
+  "dry_period_days": 3,
+  "conveyance_efficiency": 0.95,
+  "filtration_efficiency": 0.90,
+  "rainfall_source": "open_meteo",
+  "latitude": 12.9716,
+  "longitude": 77.5946,
+  "start_date": "2024-01-01",
+  "end_date": "2024-12-31"
+}
+```
+
+### `GET /api/v1/simulations/{simulation_id}`
+Retrieves stored simulation results.
+
+---
+
+## 4. Installation & Setup
+
+```bash
+# Navigate to backend directory
+cd backend
+
+# Install dependencies
+pip install -e .
+
+# Configure environment (optional - defaults are provided)
+cp .env.example .env
+# Edit .env to customize ports, CORS origins, or API settings
+```
+
+## 5. Running Backend
+
+```bash
+# From the backend directory
+cd backend
+
+# Run tests
+pytest
+
+# Run tests with verbose output
+pytest -v
+
+# Start development server
+python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+```
+
+The backend will be available at [http://127.0.0.1:8000](http://127.0.0.1:8000)
+Interactive API documentation: [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
+
+## 6. Testing
+
+The backend includes comprehensive unit tests covering:
+- Hydrological calculations (runoff, first-flush, tank balance)
+- Mass-balance invariants validation
+- Rainfall service integration
+- Simulation API endpoints
+- Unit conversions
+
+Run the full test suite:
+```bash
+pytest
+```
+
+Run specific test files:
+```bash
+pytest tests/test_tank_balance.py
+pytest tests/test_mass_balance_invariants.py
+```
