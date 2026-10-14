@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # AQUASIGHT AI — Rainwater Harvesting Assessment & Intelligence Platform
 
 > **AI-powered rainwater harvesting assessment, optimization, and decision-support platform.**
@@ -315,3 +316,6 @@ The simulation uses fixed assumptions that are disclosed in the UI:
 * **User-Provided Rainfall Series:** The UI currently only supports Open-Meteo ERA5; the backend accepts user-provided rainfall series but the frontend input is not yet implemented.
 * **Persistent Simulation Storage:** Simulation results are stored in-memory in the backend; database persistence is not yet implemented.
 * **Multi-Year Simulations:** The Open-Meteo API is configured for single-year periods; multi-year simulations require additional API configuration.
+=======
+# AQUASIGHT-AI
+>>>>>>> 6baaaa4461d22f33cfe38da71dd95909462765e7
